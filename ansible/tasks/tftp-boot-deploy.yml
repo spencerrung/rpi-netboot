@@ -1,0 +1,117 @@
+---
+# TFTP Boot Files Deployment Tasks
+# Deploys boot files and configuration for each Raspberry Pi
+
+- name: Create temporary directory for Pi firmware
+  file:
+    path: "/tmp/pi-firmware"
+    state: directory
+    mode: '0755'
+  tags: [tftp, boot]
+
+- name: Download Raspberry Pi firmware files
+  get_url:
+    url: "{{ pi_firmware_url }}/{{ item }}"
+    dest: "/tmp/pi-firmware/{{ item }}"
+    mode: '0644'
+    timeout: 30
+  loop: "{{ pi_firmware_files }}"
+  register: firmware_download
+  failed_when: false
+  tags: [tftp, boot]
+
+- name: Copy Raspberry Pi OS kernel from NFS root
+  copy:
+    src: "{{ raspios_root_dir }}/boot/vmlinuz-6.6.31+rpt-rpi-v8"
+    dest: "/tmp/pi-firmware/kernel8.img"
+    mode: '0644'
+    remote_src: yes
+  register: pi_kernel_download
+  failed_when: false
+  tags: [tftp, boot]
+
+- name: Copy Raspberry Pi OS initrd from NFS root
+  copy:
+    src: "{{ raspios_root_dir }}/boot/initrd.img-6.6.31+rpt-rpi-v8"
+    dest: "/tmp/pi-firmware/initrd.img"
+    mode: '0644'
+    remote_src: yes
+  register: pi_initrd_download
+  failed_when: false
+  tags: [tftp, boot]
+
+- name: Copy device tree overlays from NFS root
+  synchronize:
+    src: "{{ raspios_root_dir }}/usr/lib/linux-image-6.6.31+rpt-rpi-v8/overlays/"
+    dest: "/tmp/pi-firmware/overlays/"
+    rsync_opts:
+      - "--recursive"
+  delegate_to: "{{ inventory_hostname }}"
+  register: overlays_copy
+  failed_when: false
+  tags: [tftp, boot]
+
+- name: Create TFTP boot directories for each Pi
+  file:
+    path: "{{ tftp_root }}/{{ item.serial }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ raspberry_pis }}"
+  tags: [tftp, boot]
+
+- name: Copy firmware files to Pi directories
+  copy:
+    src: "/tmp/pi-firmware/{{ item[1] }}"
+    dest: "{{ tftp_root }}/{{ item[0].serial }}/{{ item[1] }}"
+    mode: '0644'
+    remote_src: yes
+  loop: "{{ raspberry_pis | product(pi_firmware_files + ['kernel8.img', 'initrd.img']) | list }}"
+  when:
+    - firmware_download is succeeded
+    - not ansible_check_mode
+  tags: [tftp, boot]
+
+- name: Copy overlays directory to Pi directories
+  synchronize:
+    src: "/tmp/pi-firmware/overlays/"
+    dest: "{{ tftp_root }}/{{ item.serial }}/overlays/"
+    rsync_opts:
+      - "--recursive"
+  delegate_to: "{{ inventory_hostname }}"
+  loop: "{{ raspberry_pis }}"
+  when:
+    - overlays_copy is succeeded
+    - not ansible_check_mode
+  tags: [tftp, boot]
+
+- name: Deploy config.txt for each Pi
+  template:
+    src: templates/config.txt.j2
+    dest: "{{ tftp_root }}/{{ item.serial }}/config.txt"
+    mode: '0644'
+  loop: "{{ raspberry_pis }}"
+  tags: [tftp, config]
+
+- name: Deploy cmdline.txt for each Pi
+  template:
+    src: templates/cmdline.txt.j2
+    dest: "{{ tftp_root }}/{{ item.serial }}/cmdline.txt"
+    mode: '0644'
+  loop: "{{ raspberry_pis }}"
+  tags: [tftp, config]
+
+- name: Fix permissions on Pi boot directories
+  file:
+    path: "{{ tftp_root }}/{{ item.serial }}"
+    owner: pi
+    group: pi
+    recurse: yes
+    mode: '0755'
+  loop: "{{ raspberry_pis }}"
+  tags: [tftp, config]
+
+- name: Cleanup temporary firmware files
+  file:
+    path: "/tmp/pi-firmware"
+    state: absent
+  tags: [tftp, cleanup]

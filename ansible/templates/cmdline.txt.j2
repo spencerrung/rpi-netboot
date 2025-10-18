@@ -1,0 +1,1 @@
+console={{ kernel_cmdline.console }} root={{ kernel_cmdline.root }} nfsroot={{ kernel_cmdline.nfsroot }} ip={{ kernel_cmdline.ip }}{% if kernel_cmdline.rw %} rw{% endif %}{% if kernel_cmdline.rootwait %} rootwait{% endif %}

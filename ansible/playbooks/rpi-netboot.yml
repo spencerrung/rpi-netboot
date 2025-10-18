@@ -1,0 +1,33 @@
+---
+# Raspberry Pi Network Boot Setup
+# Main playbook for configuring NFS root and TFTP boot infrastructure
+
+- name: Setup Raspberry Pi Network Boot Infrastructure
+  hosts: netboot_server
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    # ============================================================================
+    # NFS Root Filesystem Setup
+    # ============================================================================
+    - name: Include NFS root filesystem setup tasks
+      include_tasks: ../tasks/nfs-root-setup.yml
+
+    # ============================================================================
+    # NFS Root Configuration
+    # ============================================================================
+    - name: Include NFS root configuration tasks
+      include_tasks: ../tasks/nfs-root-config.yml
+
+    # ============================================================================
+    # TFTP Boot Files Deployment
+    # ============================================================================
+    - name: Include TFTP boot deployment tasks
+      include_tasks: ../tasks/tftp-boot-deploy.yml
+
+    # ============================================================================
+    # Status and Summary
+    # ============================================================================
+    - name: Include status and summary tasks
+      include_tasks: ../tasks/status-summary.yml

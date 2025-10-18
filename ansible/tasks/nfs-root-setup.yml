@@ -1,0 +1,71 @@
+---
+# NFS Root Filesystem Setup Tasks
+# Sets up the base NFS root filesystem for Raspberry Pi network boot
+
+- name: Check current disk space
+  shell: df -h / | tail -1 | awk '{print $4}'
+  register: disk_space
+  changed_when: false
+  tags: [nfs, setup]
+
+- name: Show available disk space
+  debug:
+    msg: "Available disk space: {{ disk_space.stdout }}"
+  tags: [nfs, setup]
+
+- name: Create NFS root directory structure
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ nfs_root_base }}"
+    - "{{ raspios_root_dir }}"
+  tags: [nfs, setup]
+
+- name: Install NFS server
+  apt:
+    name: nfs-kernel-server
+    state: present
+    update_cache: yes
+  tags: [nfs, setup]
+
+- name: Check if Raspberry Pi OS filesystem is already extracted
+  stat:
+    path: "{{ raspios_root_dir }}/bin/bash"
+  register: raspios_extracted
+  tags: [nfs, setup]
+
+- name: Download Raspberry Pi OS image
+  get_url:
+    url: "{{ raspios_image_url }}"
+    dest: "/tmp/raspios.img.xz"
+    mode: '0644'
+    timeout: 900
+  register: raspios_download
+  when: not raspios_extracted.stat.exists
+  tags: [nfs, setup]
+
+- name: Extract and mount Raspberry Pi OS image
+  shell: |
+    # Decompress the image
+    xz -d -k /tmp/raspios.img.xz 2>/dev/null || true
+
+    # Find the root partition offset
+    OFFSET=$(fdisk -l /tmp/raspios.img | grep 'Linux' | tail -1 | awk '{print $2}')
+    OFFSET_BYTES=$((OFFSET * 512))
+
+    # Mount the root partition
+    mkdir -p /mnt/raspios-temp
+    mount -o loop,offset=$OFFSET_BYTES /tmp/raspios.img /mnt/raspios-temp
+
+    # Copy filesystem to NFS root
+    rsync -aAX --exclude='/dev/*' --exclude='/proc/*' --exclude='/sys/*' --exclude='/tmp/*' --exclude='/run/*' /mnt/raspios-temp/ {{ raspios_root_dir }}/
+
+    # Unmount
+    umount /mnt/raspios-temp
+    rmdir /mnt/raspios-temp
+  when:
+    - raspios_download is succeeded
+    - not raspios_extracted.stat.exists
+  tags: [nfs, setup]

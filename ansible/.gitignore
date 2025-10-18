@@ -1,0 +1,17 @@
+# Ansible Vault password file
+.vault_pass
+vault_pass.txt
+
+# Unencrypted vault file (if you ever decrypt it)
+group_vars/vault.yml.dec
+
+# Ansible retry files
+*.retry
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Temporary files
+*.tmp
+.ansible/

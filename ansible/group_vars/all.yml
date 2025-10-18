@@ -1,0 +1,75 @@
+---
+# Raspberry Pi Network Boot Configuration
+# All shared variables for the infrastructure
+
+# Network configuration
+netboot_server_ip: "10.10.10.231"
+netboot_server_user: "pi"
+
+# NFS configuration
+nfs_root_base: "/srv/nfs"
+raspios_root_dir: "{{ nfs_root_base }}/raspios-pi"
+nfs_export_options: "*(rw,sync,no_subtree_check,no_root_squash)"
+
+# TFTP configuration
+tftp_root: "/opt/netboot/config/menus"
+
+# Raspberry Pi OS image
+raspios_version: "2024-07-04"
+raspios_image_url: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-{{ raspios_version }}/{{ raspios_version }}-raspios-bookworm-arm64-lite.img.xz"
+
+# Pi firmware
+pi_firmware_url: "https://github.com/raspberrypi/firmware/raw/master/boot"
+pi_firmware_files:
+  - start4.elf
+  - fixup4.dat
+  - bootcode.bin
+  - bcm2711-rpi-4-b.dtb
+
+# Default credentials
+pi_username: "pi"
+pi_password: "{{ vault_pi_password }}"  # Defined in vault.yml (encrypted)
+
+# SSH configuration
+# SECURITY: SSH public key is stored in vault.yml (encrypted with ansible-vault)
+# To edit: ansible-vault edit group_vars/vault.yml
+ssh_public_key: "{{ vault_ssh_public_key }}"
+
+# Raspberry Pi devices - Add your Pi serial numbers here
+# Get serial with: cat /proc/cpuinfo | grep Serial (use first 8 chars)
+raspberry_pis:
+  - serial: "94a418cd"
+    hostname: "pi-01"
+    description: "First Pi"
+  - serial: "54ab2151"
+    hostname: "pi-02"
+    description: "Second Pi - Auto-provisioned"
+  - serial: "101af127"
+    hostname: "pi-03"
+    description: "Third Pi - Auto-provisioned"
+  - serial: "c56a6028"
+    hostname: "pi-04"
+    description: "Fourth Pi - Auto-provisioned"
+  - serial: "ea4cc994"
+    hostname: "pi-05"
+    description: "Fifth Pi - Auto-provisioned"
+
+# Boot configuration
+boot_config:
+  arm_64bit: 1
+  enable_uart: 1
+  hdmi_force_hotplug: 1
+  dtoverlay: "vc4-kms-v3d"
+  max_framebuffers: 2
+  device_tree: "bcm2711-rpi-4-b.dtb"
+  kernel: "kernel8.img"
+  initramfs: "initrd.img followkernel"
+
+# Kernel command line parameters
+kernel_cmdline:
+  console: "tty1"
+  root: "/dev/nfs"
+  nfsroot: "{{ netboot_server_ip }}:{{ raspios_root_dir }},vers=3,tcp"
+  ip: "dhcp"
+  rootwait: true
+  rw: true

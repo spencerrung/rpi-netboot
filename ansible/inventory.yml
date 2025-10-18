@@ -1,0 +1,6 @@
+all:
+  hosts:
+    netboot_server:
+      ansible_host: 10.10.10.231
+      ansible_user: pi
+      ansible_ssh_private_key_file: ~/.ssh/raspberrypi_rsa

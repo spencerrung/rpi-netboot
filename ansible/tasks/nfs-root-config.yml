@@ -1,0 +1,120 @@
+---
+# NFS Root Configuration Tasks
+# Configures the NFS root filesystem with networking, SSH, and user settings
+
+- name: Set hostname
+  copy:
+    content: "raspberrypi-netboot\n"
+    dest: "{{ raspios_root_dir }}/etc/hostname"
+    mode: '0644'
+  tags: [nfs, config]
+
+- name: Enable SSH by creating ssh file in boot firmware
+  file:
+    path: "{{ raspios_root_dir }}/boot/firmware/ssh"
+    state: touch
+    mode: '0644'
+  tags: [nfs, config]
+
+- name: Check if pi user password is already set
+  shell: |
+    # Check if password hash exists and is not locked
+    grep '^{{ pi_username }}:' {{ raspios_root_dir }}/etc/shadow | grep -v '^{{ pi_username }}:!' | grep -v '^{{ pi_username }}:*'
+  register: password_check
+  failed_when: false
+  changed_when: false
+  tags: [nfs, config]
+
+- name: Set pi user password using chpasswd
+  shell: |
+    echo '{{ pi_username }}:{{ pi_password }}' | chroot {{ raspios_root_dir }} chpasswd
+  args:
+    executable: /bin/bash
+  when: password_check.rc != 0
+  tags: [nfs, config]
+
+- name: Enable SSH service in systemd
+  file:
+    src: /lib/systemd/system/ssh.service
+    dest: "{{ raspios_root_dir }}/etc/systemd/system/multi-user.target.wants/ssh.service"
+    state: link
+  tags: [nfs, config]
+
+- name: Disable userconfig service (blocks SSH login)
+  file:
+    path: "{{ raspios_root_dir }}/etc/systemd/system/multi-user.target.wants/userconfig.service"
+    state: absent
+  tags: [nfs, config]
+
+- name: Create .ssh directory for pi user
+  file:
+    path: "{{ raspios_root_dir }}/home/pi/.ssh"
+    state: directory
+    owner: 1000
+    group: 1000
+    mode: '0700'
+  tags: [nfs, config]
+
+- name: Add SSH public key to authorized_keys
+  copy:
+    content: "{{ ssh_public_key }}\n"
+    dest: "{{ raspios_root_dir }}/home/pi/.ssh/authorized_keys"
+    owner: 1000
+    group: 1000
+    mode: '0600'
+  tags: [nfs, config]
+
+- name: Enable getty on tty1 for HDMI console
+  file:
+    src: /lib/systemd/system/getty@.service
+    dest: "{{ raspios_root_dir }}/etc/systemd/system/getty.target.wants/getty@tty1.service"
+    state: link
+  tags: [nfs, config]
+
+- name: Disable resize filesystem services (not needed for NFS)
+  file:
+    path: "{{ raspios_root_dir }}/etc/systemd/system/multi-user.target.wants/resize2fs_once.service"
+    state: absent
+  ignore_errors: yes
+  tags: [nfs, config]
+
+- name: Create fstab for NFS root
+  copy:
+    content: |
+      # /etc/fstab for NFS root boot
+      proc            /proc           proc    defaults          0       0
+      sysfs           /sys            sysfs   defaults          0       0
+      tmpfs           /tmp            tmpfs   defaults,noatime,nosuid,size=100m 0 0
+      tmpfs           /var/tmp        tmpfs   defaults,noatime,nosuid,size=30m  0 0
+    dest: "{{ raspios_root_dir }}/etc/fstab"
+    mode: '0644'
+  tags: [nfs, config]
+
+- name: Update cmdline.txt in boot firmware for NFS boot
+  template:
+    src: templates/cmdline.txt.j2
+    dest: "{{ raspios_root_dir }}/boot/firmware/cmdline.txt"
+    mode: '0644'
+  tags: [nfs, config]
+
+- name: Add NFS export for Raspberry Pi OS root filesystem
+  lineinfile:
+    path: /etc/exports
+    line: "{{ raspios_root_dir }} {{ nfs_export_options }}"
+    state: present
+  register: nfs_export_added
+  tags: [nfs, config]
+
+- name: Reload NFS exports
+  command: exportfs -ra
+  when: nfs_export_added is changed
+  tags: [nfs, config]
+
+- name: Cleanup downloaded image files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/raspios.img.xz"
+    - "/tmp/raspios.img"
+  tags: [nfs, cleanup]

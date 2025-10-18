@@ -1,0 +1,39 @@
+# SSH Keys - never commit these!
+*.pem
+*.key
+*_rsa
+*_rsa.pub
+*.ppk
+
+# Ansible
+*.retry
+*.log
+.ansible/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+.*.sw?

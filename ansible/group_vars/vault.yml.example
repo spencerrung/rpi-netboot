@@ -1,0 +1,19 @@
+---
+# Vault Example - Copy to vault.yml and encrypt
+# This file shows the structure of sensitive variables
+# DO NOT put real credentials in this file
+
+# SSH public key for pi user
+# Get from: cat ~/.ssh/id_rsa.pub (or your key file)
+vault_ssh_public_key: "ssh-rsa AAAA... your-email@example.com"
+
+# Default pi user password
+# Used for console login (SSH uses key authentication)
+vault_pi_password: "your-secure-password"
+
+# Setup Instructions:
+# 1. Copy this file: cp vault.yml.example vault.yml
+# 2. Edit vault.yml with your real credentials
+# 3. Encrypt: ansible-vault encrypt vault.yml
+# 4. Commit vault.yml (encrypted) to git
+# 5. Never commit vault.yml unencrypted!

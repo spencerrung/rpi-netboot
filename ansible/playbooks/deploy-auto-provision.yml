@@ -1,0 +1,141 @@
+---
+# Deploy Pi Auto-Provisioning Service
+# Deploys and configures the auto-provisioning service that monitors TFTP logs
+# and automatically provisions new Raspberry Pis attempting to network boot
+
+- name: Deploy Pi Auto-Provisioning Service
+  hosts: netboot_server
+  become: yes
+  gather_facts: yes
+
+  vars:
+    tftp_root: "/opt/netboot/config/menus"
+    template_dir: "{{ tftp_root }}/template"
+    script_path: "/usr/local/bin/auto-provision-pi.sh"
+    service_path: "/etc/systemd/system/pi-auto-provision.service"
+
+  tasks:
+    # ============================================================================
+    # Script and Service Deployment
+    # ============================================================================
+
+    - name: Ensure scripts directory exists locally
+      stat:
+        path: ../scripts/auto-provision-pi.sh
+      delegate_to: localhost
+      register: script_exists
+      run_once: true
+      tags: [deploy]
+
+    - name: Copy auto-provision script to server
+      copy:
+        src: ../scripts/auto-provision-pi.sh
+        dest: "{{ script_path }}"
+        mode: '0755'
+        owner: root
+        group: root
+      tags: [deploy]
+
+    - name: Copy systemd service file
+      copy:
+        src: ../scripts/pi-auto-provision.service
+        dest: "{{ service_path }}"
+        mode: '0644'
+        owner: root
+        group: root
+      register: service_file
+      tags: [deploy]
+
+    # ============================================================================
+    # Template Directory Setup
+    # ============================================================================
+
+    - name: Find first existing Pi directory
+      find:
+        paths: "{{ tftp_root }}"
+        file_type: directory
+        patterns: '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+        recurse: no
+      register: existing_pis
+      tags: [template]
+
+    - name: Check if template already exists
+      stat:
+        path: "{{ template_dir }}"
+      register: template_stat
+      tags: [template]
+
+    - name: Create template from first Pi
+      command: cp -r "{{ existing_pis.files[0].path }}" "{{ template_dir }}"
+      when:
+        - existing_pis.matched > 0
+        - not template_stat.stat.exists
+      tags: [template]
+
+    - name: Set template permissions
+      file:
+        path: "{{ template_dir }}"
+        owner: pi
+        group: pi
+        mode: '0755'
+        recurse: yes
+      when: not template_stat.stat.exists
+      tags: [template]
+
+    # ============================================================================
+    # Service Configuration
+    # ============================================================================
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+      when: service_file is changed
+      tags: [service]
+
+    - name: Enable and start auto-provision service
+      systemd:
+        name: pi-auto-provision
+        enabled: yes
+        state: started
+      register: service_start
+      tags: [service]
+
+    # ============================================================================
+    # Status and Summary
+    # ============================================================================
+
+    - name: Check service status
+      command: systemctl status pi-auto-provision --no-pager
+      register: service_status
+      changed_when: false
+      failed_when: false
+      tags: [status]
+
+    - name: Show service status
+      debug:
+        msg: "{{ service_status.stdout_lines }}"
+      tags: [status]
+
+    - name: Show completion message
+      debug:
+        msg: |
+          ✅ Pi Auto-Provisioning Service Deployed!
+
+          📋 Configuration:
+          - Script: {{ script_path }}
+          - Service: {{ service_path }}
+          - Template: {{ template_dir }}
+          - TFTP Root: {{ tftp_root }}
+
+          🔍 Monitoring:
+          - View logs: sudo journalctl -u pi-auto-provision -f
+          - Check status: sudo systemctl status pi-auto-provision
+          - Service logs: tail -f /var/log/pi-auto-provision.log
+
+          🆕 Next Steps:
+          1. Any Pi that attempts network boot will be auto-provisioned
+          2. Boot files copied from template directory
+          3. No manual intervention required!
+
+          Test: Power on a new Pi with blank SD card - it will auto-provision!
+      tags: [status]
