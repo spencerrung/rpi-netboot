@@ -73,3 +73,7 @@ kernel_cmdline:
   ip: "dhcp"
   rootwait: true
   rw: true
+  # Cgroup parameters required for Kubernetes/K3s
+  cgroup_enable_cpuset: true
+  cgroup_memory: 1
+  cgroup_enable_memory: true

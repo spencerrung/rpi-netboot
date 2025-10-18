@@ -92,7 +92,7 @@
 
 - name: Update cmdline.txt in boot firmware for NFS boot
   template:
-    src: templates/cmdline.txt.j2
+    src: ../templates/cmdline.txt.j2
     dest: "{{ raspios_root_dir }}/boot/firmware/cmdline.txt"
     mode: '0644'
   tags: [nfs, config]

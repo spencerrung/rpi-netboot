@@ -86,7 +86,7 @@
 
 - name: Deploy config.txt for each Pi
   template:
-    src: templates/config.txt.j2
+    src: ../templates/config.txt.j2
     dest: "{{ tftp_root }}/{{ item.serial }}/config.txt"
     mode: '0644'
   loop: "{{ raspberry_pis }}"
@@ -94,7 +94,7 @@
 
 - name: Deploy cmdline.txt for each Pi
   template:
-    src: templates/cmdline.txt.j2
+    src: ../templates/cmdline.txt.j2
     dest: "{{ tftp_root }}/{{ item.serial }}/cmdline.txt"
     mode: '0644'
   loop: "{{ raspberry_pis }}"

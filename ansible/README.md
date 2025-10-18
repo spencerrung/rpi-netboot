@@ -75,7 +75,7 @@ cd ansible/
 
 # Main network boot setup (with vault password prompt)
 ansible-playbook -i inventory.yml playbooks/rpi-netboot.yml --ask-vault-pass
-
+ansible-playbook -i inventory.yml playbooks/rpi-netboot.yml -e "@group_vars/vault.yml"
 # Or with vault password file
 ansible-playbook -i inventory.yml playbooks/rpi-netboot.yml --vault-password-file .vault_pass
 
