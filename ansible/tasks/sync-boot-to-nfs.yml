@@ -1,0 +1,87 @@
+---
+# Sync Boot Files from TFTP to NFS Root
+# This ensures the NFS root has complete boot files for SD card provisioning
+
+- name: Check if TFTP boot directory exists
+  stat:
+    path: "{{ tftp_root }}/{{ raspberry_pis[0].serial }}"
+  register: tftp_boot_dir
+  tags: [sync-boot]
+
+- name: Fail if TFTP boot files not found
+  fail:
+    msg: "TFTP boot directory not found. Run TFTP boot deployment first."
+  when: not tftp_boot_dir.stat.exists
+  tags: [sync-boot]
+
+- name: Create boot firmware directory in NFS root
+  file:
+    path: "{{ raspios_root_dir }}/boot/firmware"
+    state: directory
+    mode: '0755'
+  tags: [sync-boot]
+
+- name: Copy boot files from TFTP to NFS root (using first Pi as template)
+  synchronize:
+    src: "{{ tftp_root }}/{{ raspberry_pis[0].serial }}/"
+    dest: "{{ raspios_root_dir }}/boot/firmware/"
+    delete: no
+    rsync_opts:
+      - "--exclude=cmdline.txt"
+      - "--exclude=automated-boot.ipxe"
+      - "--exclude=*.backup"
+  delegate_to: "{{ inventory_hostname }}"
+  tags: [sync-boot]
+
+- name: Verify critical boot files exist in NFS root
+  stat:
+    path: "{{ raspios_root_dir }}/boot/firmware/{{ item }}"
+  register: boot_files_check
+  loop:
+    - start4.elf
+    - fixup4.dat
+    - kernel8.img
+    - initrd.img
+    - config.txt
+    - bcm2711-rpi-4-b.dtb
+  tags: [sync-boot]
+
+- name: Ensure all critical boot files exist
+  fail:
+    msg: "Missing critical boot file: {{ item.item }}"
+  when: not item.stat.exists
+  loop: "{{ boot_files_check.results }}"
+  tags: [sync-boot]
+
+- name: Update cmdline.txt in NFS root boot firmware for NFS boot
+  template:
+    src: ../templates/cmdline.txt.j2
+    dest: "{{ raspios_root_dir }}/boot/firmware/cmdline.txt"
+    mode: '0644'
+  tags: [sync-boot]
+
+- name: Display boot sync summary
+  debug:
+    msg:
+      - ""
+      - "========================================="
+      - "Boot Files Synced to NFS Root!"
+      - "========================================="
+      - ""
+      - "Boot files copied from:"
+      - "  Source: {{ tftp_root }}/{{ raspberry_pis[0].serial }}/"
+      - "  Destination: {{ raspios_root_dir }}/boot/firmware/"
+      - ""
+      - "Critical files verified:"
+      - "  ✓ start4.elf (GPU firmware)"
+      - "  ✓ fixup4.dat (GPU firmware)"
+      - "  ✓ kernel8.img (Linux kernel)"
+      - "  ✓ initrd.img (Initial ramdisk)"
+      - "  ✓ config.txt (Boot configuration)"
+      - "  ✓ bcm2711-rpi-4-b.dtb (Device tree)"
+      - "  ✓ overlays/ (Device tree overlays)"
+      - ""
+      - "The NFS root now has complete boot files."
+      - "When provisioning script runs, it will copy these to SD card."
+      - ""
+  tags: [sync-boot]

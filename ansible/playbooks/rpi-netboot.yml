@@ -21,10 +21,28 @@
       include_tasks: ../tasks/nfs-root-config.yml
 
     # ============================================================================
+    # Hostname Configuration
+    # ============================================================================
+    - name: Include hostname configuration tasks
+      include_tasks: ../tasks/hostname-config.yml
+
+    # ============================================================================
+    # TFTP Server Setup
+    # ============================================================================
+    - name: Include TFTP server setup tasks
+      include_tasks: ../tasks/tftp-server-setup.yml
+
+    # ============================================================================
     # TFTP Boot Files Deployment
     # ============================================================================
     - name: Include TFTP boot deployment tasks
       include_tasks: ../tasks/tftp-boot-deploy.yml
+
+    # ============================================================================
+    # Sync Boot Files to NFS Root
+    # ============================================================================
+    - name: Include sync boot files to NFS root tasks
+      include_tasks: ../tasks/sync-boot-to-nfs.yml
 
     # ============================================================================
     # Status and Summary

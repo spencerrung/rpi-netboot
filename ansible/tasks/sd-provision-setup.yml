@@ -1,0 +1,78 @@
+---
+# Configure SD Card Auto-Provisioning
+# Adds a systemd service that provisions SD cards on first network boot
+
+- name: Copy SD card provisioning script
+  copy:
+    src: ../files/provision-sd.sh
+    dest: "{{ raspios_root_dir }}/usr/local/bin/provision-sd.sh"
+    mode: '0755'
+    owner: root
+    group: root
+  tags: [provision, sd-card]
+
+- name: Fix line endings on provisioning script (ensure Unix LF)
+  shell: |
+    if command -v dos2unix >/dev/null 2>&1; then
+      dos2unix "{{ raspios_root_dir }}/usr/local/bin/provision-sd.sh"
+    else
+      sed -i 's/\r$//' "{{ raspios_root_dir }}/usr/local/bin/provision-sd.sh"
+    fi
+  tags: [provision, sd-card]
+
+- name: Create systemd service for SD card provisioning
+  copy:
+    src: ../files/provision-sd-card.service
+    dest: "{{ raspios_root_dir }}/etc/systemd/system/provision-sd-card.service"
+    mode: '0644'
+    owner: root
+    group: root
+  tags: [provision, sd-card]
+
+- name: Enable SD provisioning service in NFS root
+  command: chroot {{ raspios_root_dir }} systemctl enable provision-sd-card.service
+  args:
+    creates: "{{ raspios_root_dir }}/etc/systemd/system/sysinit.target.wants/provision-sd-card.service"
+  tags: [provision, sd-card]
+
+- name: Display SD provisioning setup summary
+  debug:
+    msg:
+      - ""
+      - "========================================="
+      - "SD Card Auto-Provisioning Configured!"
+      - "========================================="
+      - ""
+      - "How it works:"
+      - "  1. Pi boots from NFS (network boot)"
+      - "  2. Provisioning service runs automatically"
+      - "  3. Checks if SD card is blank/unprovisioned"
+      - "  4. If yes - Copies OS to SD and reboots"
+      - "  5. If no - Skips provisioning (SD already setup)"
+      - "  6. Pi boots from SD card on next boot"
+      - ""
+      - "Implementation:"
+      - "  - Script: /usr/local/bin/provision-sd.sh"
+      - "  - Service: /etc/systemd/system/provision-sd-card.service"
+      - "  - Runs early in boot (sysinit.target)"
+      - "  - Conditional: only if /boot/firmware/.sd-provisioned doesn't exist"
+      - ""
+      - "Provisioning Details:"
+      - "  - Creates 512MB FAT32 boot partition"
+      - "  - Creates ext4 root partition (rest of SD card)"
+      - "  - Copies entire NFS root to SD card"
+      - "  - Sets unique hostname based on serial number"
+      - "  - Configures fstab and cmdline.txt for SD boot"
+      - "  - Marks SD as provisioned (.sd-provisioned marker)"
+      - ""
+      - "Next Steps:"
+      - "  1. Power on any Pi with blank SD card"
+      - "  2. It will network boot from NFS"
+      - "  3. Auto-provision service detects blank SD"
+      - "  4. Copies OS to SD (~5-10 minutes)"
+      - "  5. Pi reboots and boots from SD card"
+      - "  6. Each Pi now has independent filesystem!"
+      - ""
+      - "To re-provision: Remove .sd-provisioned from SD boot partition"
+      - ""
+  tags: [provision, sd-card, status]

@@ -1,0 +1,82 @@
+---
+# Configure unique hostnames for netbooting Raspberry Pis
+# Sets hostname based on serial number from /proc/cpuinfo
+
+- name: Create hostname configuration script
+  copy:
+    dest: "{{ raspios_root_dir }}/usr/local/bin/set-hostname-from-serial.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Set unique hostname based on Raspberry Pi serial number
+
+      # Get serial number (last 8 characters)
+      SERIAL=$(grep Serial /proc/cpuinfo | awk '{print substr($NF,9,8)}')
+
+      # Lookup hostname from configuration
+      case "$SERIAL" in
+      {% for pi in raspberry_pis %}
+        "{{ pi.serial }}")
+          HOSTNAME="{{ pi.hostname }}"
+          ;;
+      {% endfor %}
+        *)
+          HOSTNAME="raspberrypi-${SERIAL}"
+          ;;
+      esac
+
+      # Set hostname if different from current
+      CURRENT_HOSTNAME=$(hostname)
+      if [ "$CURRENT_HOSTNAME" != "$HOSTNAME" ]; then
+          echo "Setting hostname to: $HOSTNAME (serial: $SERIAL)"
+          hostnamectl set-hostname "$HOSTNAME"
+          echo "$HOSTNAME" > /etc/hostname
+
+          # Update /etc/hosts
+          sed -i "s/127.0.1.1.*/127.0.1.1\t$HOSTNAME/" /etc/hosts
+      fi
+  tags: [hostname]
+
+- name: Create systemd service for hostname configuration
+  copy:
+    dest: "{{ raspios_root_dir }}/etc/systemd/system/set-hostname.service"
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Set Hostname from Serial Number
+      DefaultDependencies=no
+      Before=network-pre.target
+      Wants=network-pre.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/set-hostname-from-serial.sh
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=sysinit.target
+  tags: [hostname]
+
+- name: Enable hostname service in NFS root
+  command: chroot {{ raspios_root_dir }} systemctl enable set-hostname.service
+  args:
+    creates: "{{ raspios_root_dir }}/etc/systemd/system/sysinit.target.wants/set-hostname.service"
+  tags: [hostname]
+
+- name: Display hostname configuration summary
+  debug:
+    msg: |
+      ✅ Hostname Configuration Added!
+
+      📝 Each Pi will set its hostname on boot based on serial number:
+      {% for pi in raspberry_pis %}
+      - {{ pi.serial }} → {{ pi.hostname }}
+      {% endfor %}
+
+      🔧 Implementation:
+      - Script: /usr/local/bin/set-hostname-from-serial.sh
+      - Service: /etc/systemd/system/set-hostname.service
+      - Runs at boot before networking starts
+
+      🔄 Reboot Pis to apply hostname changes
+  tags: [hostname]

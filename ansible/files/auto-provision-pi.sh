@@ -9,7 +9,6 @@ TFTP_ROOT="/opt/netboot/config/menus"
 TEMPLATE_DIR="${TFTP_ROOT}/template"
 LOG_FILE="/var/log/pi-auto-provision.log"
 CHECK_INTERVAL=5  # seconds
-DOCKER_CONTAINER="netbootxyz-cluster"  # Name of netbootxyz Docker container
 
 # Logging function
 log() {
@@ -36,9 +35,10 @@ provision_serial() {
     log "📋 Copying boot files from template..."
     cp -r "${TEMPLATE_DIR}"/* "${TFTP_ROOT}/${serial}/"
 
-    # Set correct permissions
-    chown -R pi:pi "${TFTP_ROOT}/${serial}"
+    # Set correct permissions (tftpd-hpa runs as tftp user)
+    chown -R tftp:tftp "${TFTP_ROOT}/${serial}"
     chmod 755 "${TFTP_ROOT}/${serial}"
+    find "${TFTP_ROOT}/${serial}" -type f -exec chmod 644 {} \;
 
     log "✅ Pi ${serial} provisioned successfully!"
     log "   Path: ${TFTP_ROOT}/${serial}"
@@ -47,12 +47,13 @@ provision_serial() {
     # notify_new_pi "${serial}"
 }
 
-# Function to extract serials from dnsmasq Docker logs
+# Function to extract serials from tftpd-hpa syslog
 get_attempted_serials() {
-    # Parse Docker logs for TFTP requests with serial patterns
-    # Look for lines like: dnsmasq-tftp[21]: file /config/menus/54ab2151/start4.elf not found
-    docker logs --since "$((CHECK_INTERVAL + 2))s" "$DOCKER_CONTAINER" 2>&1 \
-        | grep -oP '/config/menus/\K[0-9a-f]{8}(?=/)' \
+    # Parse syslog for TFTP requests with serial patterns
+    # tftpd-hpa logs to syslog: "file /opt/netboot/config/menus/54ab2151/start4.elf not found"
+    # or "sent /opt/netboot/config/menus/54ab2151/start4.elf"
+    journalctl --since "$((CHECK_INTERVAL + 2)) seconds ago" -u tftpd-hpa 2>/dev/null \
+        | grep -oP "${TFTP_ROOT}/\K[0-9a-f]{8}(?=/)" \
         | sort -u
 }
 
@@ -68,6 +69,7 @@ ensure_template_exists() {
         if [[ -n "$first_pi" ]]; then
             log "📋 Using $(basename "$first_pi") as template"
             cp -r "$first_pi" "$TEMPLATE_DIR"
+            chown -R tftp:tftp "$TEMPLATE_DIR"
             log "✅ Template created"
         else
             log "❌ ERROR: No existing Pi directories found to use as template!"
@@ -83,6 +85,7 @@ main() {
     log "📂 TFTP Root: ${TFTP_ROOT}"
     log "📋 Template: ${TEMPLATE_DIR}"
     log "⏱️  Check Interval: ${CHECK_INTERVAL}s"
+    log "🔍 Monitoring: journalctl -u tftpd-hpa"
     log ""
 
     # Ensure template directory exists
