@@ -1,0 +1,15 @@
+---
+# Enable SD Card Auto-Provisioning
+# Configures the NFS root to automatically provision SD cards on boot
+
+- name: Enable SD Card Auto-Provisioning
+  hosts: netboot_server
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Sync boot files from TFTP to NFS root
+      include_tasks: ../tasks/sync-boot-to-nfs.yml
+
+    - name: Include SD provisioning setup tasks
+      include_tasks: ../tasks/sd-provision-setup.yml

@@ -1,0 +1,111 @@
+---
+# Auto-Provision Service Deployment Tasks
+# Deploys the dynamic TFTP provisioning service
+
+- name: Copy auto-provision script to netboot server
+  copy:
+    src: ../files/auto-provision-pi.sh
+    dest: /usr/local/bin/auto-provision-pi.sh
+    owner: root
+    group: root
+    mode: '0755'
+  tags: [auto-provision, deploy]
+
+- name: Copy auto-provision systemd service
+  copy:
+    src: ../files/pi-auto-provision.service
+    dest: /etc/systemd/system/pi-auto-provision.service
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [auto-provision, deploy]
+
+- name: Create template directory from first Pi
+  block:
+    - name: Find first existing Pi directory
+      find:
+        paths: "{{ tftp_root }}"
+        file_type: directory
+        patterns: '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+      register: existing_pi_dirs
+
+    - name: Check if template already exists
+      stat:
+        path: "{{ tftp_root }}/template"
+      register: template_dir
+
+    - name: Create template from first Pi directory
+      command: "cp -r {{ existing_pi_dirs.files[0].path }} {{ tftp_root }}/template"
+      when:
+        - not template_dir.stat.exists
+        - existing_pi_dirs.matched > 0
+
+    - name: Set template permissions
+      file:
+        path: "{{ tftp_root }}/template"
+        owner: tftp
+        group: tftp
+        mode: '0755'
+        recurse: yes
+      when: not template_dir.stat.exists
+  tags: [auto-provision, template]
+
+- name: Create log file
+  file:
+    path: /var/log/pi-auto-provision.log
+    state: touch
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [auto-provision, deploy]
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+  tags: [auto-provision, deploy]
+
+- name: Enable and start auto-provision service
+  systemd:
+    name: pi-auto-provision
+    enabled: yes
+    state: started
+  tags: [auto-provision, deploy]
+
+- name: Wait for service to start
+  wait_for:
+    timeout: 5
+  tags: [auto-provision, verify]
+
+- name: Verify auto-provision service is running
+  systemd:
+    name: pi-auto-provision
+    state: started
+  register: service_status
+  tags: [auto-provision, verify]
+
+- name: Display auto-provision service summary
+  debug:
+    msg: |
+      =========================================
+      Auto-Provisioning Service Deployed!
+      =========================================
+
+      Service Status: {{ service_status.status.ActiveState }}
+
+      📂 TFTP Root: {{ tftp_root }}
+      📋 Template: {{ tftp_root }}/template
+      📝 Log File: /var/log/pi-auto-provision.log
+
+      How it works:
+      1. New Pi attempts network boot
+      2. TFTP server logs the request
+      3. Auto-provision service detects new serial
+      4. Creates directory from template
+      5. Pi boots successfully!
+
+      Monitor logs:
+        sudo journalctl -u pi-auto-provision -f
+        tail -f /var/log/pi-auto-provision.log
+
+      Now you can boot 300+ Pis with ZERO manual configuration!
+  tags: [auto-provision, verify]

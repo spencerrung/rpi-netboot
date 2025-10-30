@@ -1,0 +1,15 @@
+---
+# Enable Auto-Provisioning Service
+# Deploys dynamic TFTP provisioning for scalable Pi deployment
+
+- name: Enable Auto-Provisioning for Raspberry Pi Network Boot
+  hosts: netboot_server
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    # ============================================================================
+    # Auto-Provision Service Deployment
+    # ============================================================================
+    - name: Include auto-provision deployment tasks
+      include_tasks: ../tasks/auto-provision-deploy.yml

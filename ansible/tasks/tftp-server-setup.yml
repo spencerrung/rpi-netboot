@@ -1,0 +1,70 @@
+---
+# TFTP Server Setup Tasks
+# Installs and configures tftpd-hpa to serve boot files
+
+- name: Install TFTP server package
+  apt:
+    name: tftpd-hpa
+    state: present
+    update_cache: yes
+  tags: [tftp, install]
+
+- name: Stop TFTP service before configuration
+  systemd:
+    name: tftpd-hpa
+    state: stopped
+  ignore_errors: yes
+  tags: [tftp, config]
+
+- name: Configure TFTP server directory
+  lineinfile:
+    path: /etc/default/tftpd-hpa
+    regexp: '^TFTP_DIRECTORY='
+    line: 'TFTP_DIRECTORY="{{ tftp_root }}"'
+    create: yes
+  tags: [tftp, config]
+
+- name: Configure TFTP server address
+  lineinfile:
+    path: /etc/default/tftpd-hpa
+    regexp: '^TFTP_ADDRESS='
+    line: 'TFTP_ADDRESS=":69"'
+  tags: [tftp, config]
+
+- name: Configure TFTP server options
+  lineinfile:
+    path: /etc/default/tftpd-hpa
+    regexp: '^TFTP_OPTIONS='
+    line: 'TFTP_OPTIONS="--secure"'
+  tags: [tftp, config]
+
+- name: Configure TFTP username
+  lineinfile:
+    path: /etc/default/tftpd-hpa
+    regexp: '^TFTP_USERNAME='
+    line: 'TFTP_USERNAME="tftp"'
+  tags: [tftp, config]
+
+- name: Enable TFTP service
+  systemd:
+    name: tftpd-hpa
+    enabled: yes
+  tags: [tftp, config]
+
+- name: Start TFTP service
+  systemd:
+    name: tftpd-hpa
+    state: started
+  tags: [tftp, config]
+
+- name: Verify TFTP service is running
+  systemd:
+    name: tftpd-hpa
+    state: started
+  register: tftp_status
+  tags: [tftp, verify]
+
+- name: Display TFTP service status
+  debug:
+    msg: "TFTP server is {{ tftp_status.status.ActiveState }} and serving from {{ tftp_root }}"
+  tags: [tftp, verify]

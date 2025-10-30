@@ -1,0 +1,12 @@
+---
+# Update Hostname Configuration Only
+# Sets up hostname configuration without touching other netboot settings
+
+- name: Configure Unique Hostnames for Network Boot
+  hosts: netboot_server
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Include hostname configuration tasks
+      include_tasks: ../tasks/hostname-config.yml

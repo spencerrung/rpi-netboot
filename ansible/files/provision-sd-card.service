@@ -1,0 +1,16 @@
+[Unit]
+Description=Provision SD Card from Network Boot
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target
+ConditionPathExists=!/boot/firmware/.sd-provisioned
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/provision-sd.sh
+StandardOutput=journal+console
+StandardError=journal+console
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

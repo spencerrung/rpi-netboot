@@ -35,9 +35,10 @@
 
 - name: Enable SSH service in systemd
   file:
-    src: /lib/systemd/system/ssh.service
+    src: "{{ raspios_root_dir }}/usr/lib/systemd/system/ssh.service"
     dest: "{{ raspios_root_dir }}/etc/systemd/system/multi-user.target.wants/ssh.service"
     state: link
+    force: yes
   tags: [nfs, config]
 
 - name: Disable userconfig service (blocks SSH login)
@@ -64,11 +65,19 @@
     mode: '0600'
   tags: [nfs, config]
 
+- name: Create getty.target.wants directory
+  file:
+    path: "{{ raspios_root_dir }}/etc/systemd/system/getty.target.wants"
+    state: directory
+    mode: '0755'
+  tags: [nfs, config]
+
 - name: Enable getty on tty1 for HDMI console
   file:
-    src: /lib/systemd/system/getty@.service
+    src: "{{ raspios_root_dir }}/usr/lib/systemd/system/getty@.service"
     dest: "{{ raspios_root_dir }}/etc/systemd/system/getty.target.wants/getty@tty1.service"
     state: link
+    force: yes
   tags: [nfs, config]
 
 - name: Disable resize filesystem services (not needed for NFS)
@@ -76,6 +85,23 @@
     path: "{{ raspios_root_dir }}/etc/systemd/system/multi-user.target.wants/resize2fs_once.service"
     state: absent
   ignore_errors: yes
+  tags: [nfs, config]
+
+- name: Disable EEPROM update service (prevents boot order changes)
+  file:
+    path: "{{ raspios_root_dir }}/etc/systemd/system/multi-user.target.wants/rpi-eeprom-update.service"
+    state: absent
+  tags: [nfs, config]
+
+- name: Remove any pending EEPROM update files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ raspios_root_dir }}/boot/pieeprom.upd"
+    - "{{ raspios_root_dir }}/boot/recovery.bin"
+    - "{{ raspios_root_dir }}/boot/firmware/pieeprom.upd"
+    - "{{ raspios_root_dir }}/boot/firmware/recovery.bin"
   tags: [nfs, config]
 
 - name: Create fstab for NFS root
