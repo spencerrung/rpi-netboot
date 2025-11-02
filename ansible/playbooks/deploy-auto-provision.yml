@@ -21,7 +21,7 @@
 
     - name: Ensure scripts directory exists locally
       stat:
-        path: ../scripts/auto-provision-pi.sh
+        path: ../files/auto-provision-pi.sh
       delegate_to: localhost
       register: script_exists
       run_once: true
@@ -29,16 +29,17 @@
 
     - name: Copy auto-provision script to server
       copy:
-        src: ../scripts/auto-provision-pi.sh
+        src: ../files/auto-provision-pi.sh
         dest: "{{ script_path }}"
         mode: '0755'
         owner: root
         group: root
+      register: script_file
       tags: [deploy]
 
     - name: Copy systemd service file
       copy:
-        src: ../scripts/pi-auto-provision.service
+        src: ../files/pi-auto-provision.service
         dest: "{{ service_path }}"
         mode: '0644'
         owner: root
@@ -98,6 +99,13 @@
         enabled: yes
         state: started
       register: service_start
+      tags: [service]
+
+    - name: Restart auto-provision service if script or service file changed
+      systemd:
+        name: pi-auto-provision
+        state: restarted
+      when: script_file is changed or service_file is changed
       tags: [service]
 
     # ============================================================================

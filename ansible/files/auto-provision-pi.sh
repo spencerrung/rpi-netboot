@@ -50,10 +50,10 @@ provision_serial() {
 # Function to extract serials from tftpd-hpa syslog
 get_attempted_serials() {
     # Parse syslog for TFTP requests with serial patterns
-    # tftpd-hpa logs to syslog: "file /opt/netboot/config/menus/54ab2151/start4.elf not found"
-    # or "sent /opt/netboot/config/menus/54ab2151/start4.elf"
+    # tftpd-hpa verbose logs: "RRQ from 10.10.10.122 filename e2c042ff/start4.elf"
+    # or old format: "file /opt/netboot/config/menus/54ab2151/start4.elf not found"
     journalctl --since "$((CHECK_INTERVAL + 2)) seconds ago" -u tftpd-hpa 2>/dev/null \
-        | grep -oP "${TFTP_ROOT}/\K[0-9a-f]{8}(?=/)" \
+        | grep -oP '(?:filename\s+|'"${TFTP_ROOT}"'/)\K[0-9a-f]{8}(?=/)' \
         | sort -u
 }
 
