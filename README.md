@@ -554,3 +554,19 @@ Validate the helper locally with:
 ```sh
 python3 -B -m unittest discover -s scripts -p 'test_update_local_boot_initramfs.py'
 ```
+
+### Initramfs build space on NFS-root nodes
+
+The NFS image mounts `/var/tmp` as a 30 MB tmpfs. Newer kernel modules exceed
+that limit during initramfs generation, even when the NFS root has free space.
+Provisioning now creates a root-only `/var/lib/initramfs-tools/tmp` directory
+and sets `TMPDIR` in `/etc/initramfs-tools/conf.d/netboot-build-space`.
+`mkinitramfs` reads this setting before creating its temporary build files.
+The small general-purpose tmpfs mounts remain unchanged.
+
+For an existing node, create that directory with mode 0700 and install the
+configuration before a kernel update. If package configuration already failed,
+wait for apt to exit, then run `sudo dpkg --configure -a` and verify
+`sudo dpkg --audit` is empty. Check the generated initramfs for the target
+kernel's NFS/network modules before using `update-netboot-kernel.py` to stage
+the matched TFTP files. Do not reboot with incomplete kernel packages.

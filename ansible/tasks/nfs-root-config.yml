@@ -116,6 +116,35 @@
     mode: '0644'
   tags: [nfs, config]
 
+- name: Create persistent initramfs build directory
+  file:
+    path: "{{ raspios_root_dir }}/var/lib/initramfs-tools/tmp"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  tags: [nfs, config]
+
+- name: Create initramfs configuration directory
+  file:
+    path: "{{ raspios_root_dir }}/etc/initramfs-tools/conf.d"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  tags: [nfs, config]
+
+- name: Build initramfs outside the small temporary filesystems
+  copy:
+    content: |
+      # /var/tmp is a 30 MB tmpfs; kernel module expansion needs more space.
+      TMPDIR=/var/lib/initramfs-tools/tmp
+    dest: "{{ raspios_root_dir }}/etc/initramfs-tools/conf.d/netboot-build-space"
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [nfs, config]
+
 - name: Update cmdline.txt in boot firmware for NFS boot
   template:
     src: ../templates/cmdline.txt.j2
