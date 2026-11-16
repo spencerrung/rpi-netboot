@@ -518,3 +518,39 @@ ansible netboot_server -i inventory.yml -a \
 MIT License - Use freely for your infrastructure
 
 
+
+### Keep SD-boot initramfs files aligned with package updates
+
+Provisioned SD cards may have `initramfs initrd.img followkernel` in
+`/boot/firmware/config.txt`. Raspberry Pi OS updates `kernel8.img` and
+`initramfs8`, leaving that copied `initrd.img` unchanged. A kernel update can
+therefore leave the configured initramfs containing older modules. Verify the
+actual boot filenames before rebooting; a successful package transaction alone
+is insufficient.
+
+For an SD-boot Pi, use the helper in dry-run mode first, then apply it:
+
+```sh
+sudo python3 scripts/update-local-boot-initramfs.py --kernel "$(uname -r)"
+sudo python3 scripts/update-local-boot-initramfs.py --kernel "$(uname -r)" --apply
+```
+
+When installing a new kernel before reboot, pass its exact release instead of
+`uname -r`. The helper verifies the boot-kernel checksum, root module directory
+and initramfs module release before writing anything. It atomically installs
+`initramfs8` and changes only the explicit initramfs directive. Old configuration
+and any prior `initramfs8` are retained under `/root/boot-initramfs-backup-*`;
+`initrd.img`, kernels and boot order are preserved. Subsequent package updates
+maintain the selected filename.
+
+For an offline SD card mounted on a healthy Linux host, pass both its root and
+boot partition paths with `--root /mnt/pi-root --boot /mnt/pi-boot`. Do not
+reimage the card to correct this filename. For NFS/TFTP boot, continue using
+`update-netboot-kernel.py`, which intentionally maintains the matched TFTP
+`kernel8.img`/`initrd.img` pair.
+
+Validate the helper locally with:
+
+```sh
+python3 -B -m unittest discover -s scripts -p 'test_update_local_boot_initramfs.py'
+```
