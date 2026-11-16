@@ -51,12 +51,17 @@ def update(root, tftp, serial, kernel, apply=False):
             if target.is_symlink():
                 target.unlink()
             shutil.copy2(source, target)
+            # initramfs tools may create root-only images; TFTP must read them.
+            target.chmod(0o644)
         target = stage / 'overlays'
         if target.is_symlink():
             target.unlink()
         elif target.exists():
             shutil.rmtree(target)
         shutil.copytree(overlays, target)
+        target.chmod(0o755)
+        for entry in target.rglob("*"):
+            entry.chmod(0o755 if entry.is_dir() else 0o644)
         os.sync()
         boot.rename(backup)
         try:
