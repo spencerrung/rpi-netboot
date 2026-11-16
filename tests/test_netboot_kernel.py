@@ -29,6 +29,7 @@ class UpgradeTest(unittest.TestCase):
                 p = root / name
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text('new ' + name)
+                p.chmod(0o600)
             (root / 'lib/modules' / kernel).mkdir(parents=True)
             upgrade.update(root, tftp, serial, kernel)
             self.assertEqual((boot / 'kernel8.img').read_text(), 'old kernel')
@@ -40,6 +41,8 @@ class UpgradeTest(unittest.TestCase):
             self.assertEqual((backups[0] / 'kernel8.img').read_text(), 'old kernel')
             self.assertEqual((boot / 'cmdline.txt').read_text(), (backups[0] / 'cmdline.txt').read_text())
             self.assertTrue((boot / 'overlays/test.dtbo').exists())
+            for name in ['kernel8.img', 'initrd.img', 'bcm2711-rpi-4-b.dtb', 'overlays/test.dtbo']:
+                self.assertEqual((boot / name).stat().st_mode & 0o777, 0o644)
 
 
 if __name__ == '__main__':
